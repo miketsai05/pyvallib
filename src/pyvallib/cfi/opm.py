@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
 
 from .blackscholes import BlackScholes
 
@@ -238,11 +239,12 @@ class OPM:
             pd.DataFrame: DataFrame containing the option values for each set of breakpoints.
         """
 
-        call_options = BlackScholes(equity_value, self.breakpoints.From, T, volatility, rfr).call_price()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            call_options = BlackScholes(equity_value, self.breakpoints.From, T, volatility, rfr).call_price()
         option_values = -np.diff(call_options, append=0)
         value_allocation = np.expand_dims(option_values, axis=1) * self.allocation
         fair_value_class = value_allocation.sum(axis=0)
-        fair_value_share = fair_value_class / self.cap_structure.sharecount
+        fair_value_share = fair_value_class / self.cap_structure.sharecount.to_numpy()
 
         return {
             "option_values": option_values,
@@ -250,3 +252,25 @@ class OPM:
             "fair_value_class": fair_value_class,
             "fair_value_share": fair_value_share,
         }
+
+    def backsolve(self, target_value: float, target_class: str, T: float, volatility: float, rfr: float):
+        """
+        Backsolve for the equity value given a target value for a specific class of shares.
+
+        Parameters:
+            target_value (float): The target value for the specified class of shares.
+            target_class (str): The class of shares to backsolve for.
+            T (float): Expected time to exit or liquidity event.
+            volatility (float): Volatility of the underlying equity value.
+            rfr (float): Risk-free rate.
+
+        Returns:
+            float: The backsolved equity value.
+        """
+        if target_class not in self.cap_structure.class_name.values:
+            raise ValueError(f"Class {target_class} not found in capital structure.")
+
+        def solver_func(implied_equity):
+            return abs(self.model(implied_equity, T, volatility, rfr)["fair_value_class"][target_class] - target_value)
+
+        return minimize_scalar(solver_func).x
