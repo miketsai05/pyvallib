@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
+from scipy.stats import norm
 
 from .blackscholes import BlackScholes
 
@@ -108,7 +109,9 @@ class OPM:
         Calculate all liquidation preference breakpoints by seniority.
         """
         liqpref = pd.DataFrame(
-            0.0, index=self.cap_structure.seniority.dropna().unique(), columns=self.cap_structure.class_name.to_list()
+            0.0,
+            index=self.cap_structure.seniority.dropna().sort_values().unique(),
+            columns=self.cap_structure.class_name.to_list(),
         )
 
         for i, row in liqpref.iterrows():
@@ -139,7 +142,10 @@ class OPM:
 
         interim.loc[:, self.cap_structure.class_name.to_list()] = 0.0
         interim.reset_index(inplace=True, drop=True)
-        interim.loc[:, "Common"] = 1579
+
+        # Populate common sharecounts across all breakpoints
+        ind = self.cap_structure.type == "Common"
+        interim[self.cap_structure[ind].class_name] = self.cap_structure[ind].sharecount.to_list()
 
         # TO DO #
         # collapse to only unqiue and update class_name
@@ -155,11 +161,20 @@ class OPM:
             if ind.any():
                 interim.loc[i, self.cap_structure[ind].class_name] = self.cap_structure[ind].sharecount.to_list()
 
-            # Populate description
+            # Populate description for row
+            ind = interim.loc[i, self.cap_structure.class_name.to_list()] > 0
+
+            if sum(ind) == len(self.cap_structure):
+                des_classes = "All shares"
+            else:
+                des_classes = ", ".join(ind[ind].index)
+
             if row.type == "cap_point":
-                interim.loc[i, "Description"] = f"{row.class_name} participates until reaching participation cap"
+                interim.loc[
+                    i, "Description"
+                ] = f"{des_classes} receive distributions until {row.class_name} reaches participation cap"
             if row.type == "conversion_point":
-                interim.loc[i, "Description"] = f"{row.class_name} converts to common shares"
+                interim.loc[i, "Description"] = f"{des_classes} receive distributions until {row.class_name} converts"
 
         interim["incremental_common_value"] = np.diff(interim.common_value, prepend=0)
         interim["incremental_distribution"] = (
@@ -246,11 +261,18 @@ class OPM:
         fair_value_class = value_allocation.sum(axis=0)
         fair_value_share = fair_value_class / self.cap_structure.sharecount.to_numpy()
 
+        with np.errstate(divide="ignore", invalid="ignore"):
+            nd1 = norm.cdf(BlackScholes(equity_value, self.breakpoints.From, T, volatility, rfr).d1)
+            incremental_nd1 = -np.diff(nd1, append=0)
+            class_nd1 = (np.expand_dims(incremental_nd1, axis=1) * self.allocation).sum(axis=0)
+            series_specific_vol = volatility * class_nd1 * equity_value / fair_value_class
+
         return {
             "option_values": option_values,
             "value_allocation": value_allocation,
             "fair_value_class": fair_value_class,
             "fair_value_share": fair_value_share,
+            "series_specific_vol": series_specific_vol,
         }
 
     def backsolve(self, target_value: float, target_class: str, T: float, volatility: float, rfr: float):
