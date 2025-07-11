@@ -199,7 +199,7 @@ class OPM:
         final[self.cap_structure[ind].class_name] = self.cap_structure[ind].sharecount
 
         final["type"] = "all"
-        final["Description"] = "All shares receive distributions"
+        final["Description"] = "All shares receive distributions pro rata"
 
         return final
 
