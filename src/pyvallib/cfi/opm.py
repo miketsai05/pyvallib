@@ -23,23 +23,23 @@ class CapitalStructure(pd.DataFrame):
             - participation_cap_multiple: participation cap multiple if applicable (otherwise leave as None)
     """
 
-    cols = {
-        "class_name": "str",
-        "type": "str",
-        "sharecount": "int",
-        "seniority": "int",
-        "liquidation_preference_per_share": "float",
-        "convertible": "bool",
-        "conversion_ratio": "float",
-        "participating": "bool",
-        "participation_cap_multiple": "float",
-    }
+    cols = [
+        "class_name",
+        "type",
+        "sharecount",
+        "seniority",
+        "liquidation_preference_per_share",
+        "convertible",
+        "conversion_ratio",
+        "participating",
+        "participation_cap_multiple",
+    ]
 
     allowed_types = ["Preferred", "Common"]
 
     def __init__(self, data, cols=cols, allowed_types=allowed_types, **kwargs):
         super().__init__(data, **kwargs)
-        missing_cols = set(cols.keys()) - set(self.columns)
+        missing_cols = set(cols) - set(self.columns)
         # ensure all required columns are present
         if missing_cols:
             raise ValueError(f"DataFrame missing following required columns: {missing_cols}")
@@ -48,7 +48,7 @@ class CapitalStructure(pd.DataFrame):
             raise ValueError("class_name column must be unique")
         # ensure type column contains only valid types
         if not self.type.isin(allowed_types).all():
-            raise ValueError(f"type column must contain only {self.types} values")
+            raise ValueError(f"type column must contain only {', '.join(self.allowed_types)} values")
 
         self.replace(to_replace=[None], value=np.nan, inplace=True)
         self.loc[self.convertible.isna(), "convertible"] = False
@@ -275,7 +275,7 @@ class OPM:
             "series_specific_vol": series_specific_vol,
         }
 
-    def backsolve(self, target_value: float, target_class: str, T: float, volatility: float, rfr: float):
+    def backsolve(self, target_value: float, target_class: str, T: float, volatility: float, rfr: float, tol=1e-12):
         """
         Backsolve for the equity value given a target value for a specific class of shares.
 
@@ -290,9 +290,9 @@ class OPM:
             float: The backsolved equity value.
         """
         if target_class not in self.cap_structure.class_name.values:
-            raise ValueError(f"Class {target_class} not found in capital structure.")
+            raise ValueError(f"Class {target_class} not found in capital structure")
 
         def solver_func(implied_equity):
             return abs(self.model(implied_equity, T, volatility, rfr)["fair_value_class"][target_class] - target_value)
 
-        return minimize_scalar(solver_func).x
+        return minimize_scalar(solver_func, tol=tol).x
