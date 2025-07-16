@@ -10,8 +10,8 @@
 #     conv_price = The conversion price
 #     T: The total time horizon from valuation date
 #     sigma: The volatility of the underlying asset
-#     r: The risk-free interest rate
-#     r_risky: The risky interest rate
+#     r: The risk-free rate
+#     r_risky: The risky rate
 #     M: The number of time steps
 #     q: The continuous dividend yield (default is 0)
 

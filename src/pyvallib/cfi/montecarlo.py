@@ -9,7 +9,7 @@ class MonteCarlo:
     S: The spot price of the underlying asset
     T: The time to simulation step from valuation date (1xM numpy array or scalar)
     sigma: The volatility of the underlying asset
-    r: The risk-free interest rate
+    r: The risk-free rate
     n: The number of simulation paths
     q: The continuous dividend yield (default is 0)
     seed: The seed for the random number generator (default is 2024)

@@ -11,7 +11,7 @@ class BlackScholes:
     K: The strike price
     T: The time to maturity (in years)
     sigma: The volatility of the underlying asset
-    r: The risk-free interest rate
+    r: The risk-free rate
     q: The continuous dividend yield (default is 0)
     """
 

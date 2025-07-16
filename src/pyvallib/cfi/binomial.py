@@ -9,7 +9,7 @@ class BinomialCRR:
     S: The spot price of the underlying asset
     T: The total time horizon from valuation date
     sigma: The volatility of the underlying asset
-    r: The risk-free interest rate
+    r: The risk-free rate
     M: The number of time steps
     q: The continuous dividend yield (default is 0)
 
